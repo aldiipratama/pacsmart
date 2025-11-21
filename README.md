@@ -66,34 +66,87 @@
 
 -----
 
-## 🚀 Installation
+## 🚀 Installation Guide
 
-### 1\. Download the script
+Pacsmart is a standalone Bash script. You don't need to compile anything.
 
-You can clone this repo or download the script directly.
+### Prerequisites
+
+Ensure you have **Arch Linux** (or derivative) and at least one of these installed:
+
+  * `pacman` (Default)
+  * `yay` (Recommended)
+  * `paru` (Recommended)
+
+### Method 1: Quick Install (Recommended)
+
+Copy and paste this block into your terminal to download and install automatically:
+
+```bash
+# 1. Download the script
+curl -O https://raw.githubusercontent.com/aldiipratama/pacsmart/main/pacsmart
+
+# 2. Give it execute permission
+chmod +x pacsmart
+
+# 3. Move to your binary path (Requires Sudo)
+sudo mv pacsmart /usr/local/bin/
+
+# 4. Verify installation
+pacsmart --version
+```
+
+### Method 2: Manual / Git Clone
+
+If you want to inspect the code or contribute:
 
 ```bash
 git clone https://github.com/aldiipratama/pacsmart.git
 cd pacsmart
-```
-
-### 2\. Make it executable & Global
-
-Move it to your binary path so you can run it from anywhere.
-
-```bash
 chmod +x pacsmart
 sudo cp pacsmart /usr/local/bin/
 ```
 
-### 3\. (Optional) Setup Alias
+-----
 
-For the true experience, add this to your `.bashrc` or `.zshrc`:
+### ⚡ Setup Aliases (The Pro Move)
+
+To get the full "Arcade Experience", replace your standard commands with Pacsmart aliases.
+
+Add the following lines to your shell configuration file (usually `~/.bashrc` or `~/.zshrc`):
 
 ```bash
+# ~/.zshrc or ~/.bashrc
+
+# Option A: Safety First (Use 'pac' keyword)
 alias pac="pacsmart"
-# Or replace pacman entirely:
+
+# Option B: Full Replacement (Override 'pacman')
+# WARNING: This replaces the standard pacman command visually
 alias pacman="pacsmart"
+alias yay="pacsmart --use=yay"
+alias paru="pacsmart --use=paru"
+```
+
+**Apply changes:**
+
+```bash
+source ~/.bashrc
+# or
+source ~/.zshrc
+```
+
+Now, just type `pac -S neovim` and enjoy the show\! 🍒
+
+-----
+
+### 🗑️ Uninstallation
+
+If you want to remove Pacsmart (but why would you?):
+
+```bash
+sudo rm /usr/local/bin/pacsmart
+rm ~/pkg-installed.txt  # Removes your high score/rank data
 ```
 
 -----
