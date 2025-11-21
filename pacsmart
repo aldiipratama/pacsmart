@@ -1,0 +1,344 @@
+#!/usr/bin/env bash
+
+# Created by:
+#
+#     █████╗ ██╗     ██╗  ██╗██████╗ ██╗   ██╗██╗   ██╗
+#    ██╔══██╗██║     ╚██╗██╔╝██╔══██╗╚██╗ ██╔╝╚██╗ ██╔╝
+#    ███████║██║      ╚███╔╝ ██║  ██║ ╚████╔╝  ╚████╔╝ 
+#    ██╔══██║██║      ██╔██╗ ██║  ██║  ╚██╔╝    ╚██╔╝  
+#    ██║  ██║███████╗██╔╝ ██╗██████╔╝   ██║      ██║   
+#    ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═════╝    ╚═╝      ╚═╝   
+# Github: https://github.com/aldiipratama
+# Repository: https://github.com/aldiipratama/pacsmart
+
+# -------------------------
+# 1. Configuration & Colors
+# -------------------------
+set -e
+
+# --- COLORS (High Contrast) ---
+BOLD=$(printf '\033[1m')
+DIM=$(printf '\033[2m')
+C_PACMAN=$(printf '\033[1;33m') # Yellow
+C_BLINKY=$(printf '\033[1;31m') # Red
+C_INKY=$(printf '\033[1;36m')   # Cyan
+C_PINKY=$(printf '\033[1;35m')  # Magenta
+C_CLYDE=$(printf '\033[1;32m')  # Green
+C_TEXT=$(printf '\033[1;37m')   # Bright White
+C_GREY=$(printf '\033[0;37m')   # Light Grey
+NC=$(printf '\033[0m')          # Reset
+
+# Icons
+ICON_PAC="ᗧ"
+ICON_GHOST="ᗣ"
+ICON_PELLET="•"
+ICON_CHERRY="🍒"
+ICON_SAVE="💾"
+ICON_SKULL="💀"
+ICON_WARN="⚠️"
+ICON_SWORD="⚔️ "
+ICON_GEAR="⚙️ "
+ICON_TROPHY="🏆"
+ICON_KEY="🔑"
+ICON_BROOM="🧹"
+ICON_MEDIC="🚑"
+ICON_FAST="⏩"
+ICON_SEARCH="🔍"
+ICON_BOOK="📖"
+
+# Log File
+LOG_FILE="$HOME/pkg-installed.txt"
+
+# Global Variables
+AUR_HELPER=""
+RAW_ARGS=("$@")
+MODE=""
+TARGETS=()
+PASSTHROUGH_FLAGS=() 
+FAST_MODE=0
+
+# -------------------------
+# 2. Core Functions
+# -------------------------
+
+init_sudo() {
+    if [[ $EUID -ne 0 ]]; then
+        if ! sudo -n true 2>/dev/null; then
+            echo -e "${C_INKY}${ICON_KEY} Authentication Required...${NC}"
+            sudo -v || exit 1
+        fi
+        while true; do sudo -n true; sleep 60; kill -0 "$$" || exit; done 2>/dev/null &
+    fi
+}
+
+detect_aur_helper() {
+    if command -v yay &>/dev/null; then AUR_HELPER="yay"
+    elif command -v paru &>/dev/null; then AUR_HELPER="paru"
+    elif command -v pacman &>/dev/null; then AUR_HELPER="sudo pacman"
+    else echo "Error: No helper found"; exit 1; fi
+}
+
+# --- UI ENGINE ---
+strip_colors() { echo -e "$1" | sed "s/\x1B\[[0-9;]*[a-zA-Z]//g"; }
+
+print_row() {
+    local label="$1"; local value="$2"; local width=36
+    local clean_val=$(strip_colors "$value"); local val_len=${#clean_val}
+    local pad_len=$((width - val_len)); if [[ $pad_len -lt 0 ]]; then pad_len=0; fi
+    local padding=$(printf '%*s' "$pad_len" "")
+    echo -e "${C_TEXT}│${NC}  ${C_GREY}${label}${NC} : ${BOLD}${value}${NC}${padding} ${C_TEXT}│${NC}"
+}
+
+print_cmd() {
+    local flag="$1"; local desc="$2"
+    printf "    ${C_INKY}%-24s${NC} %s\n" "$flag" "${C_TEXT}$desc${NC}"
+}
+
+# --- THE ULTIMATE HELP MENU (Updated) ---
+show_help() {
+    clear
+    detect_aur_helper
+    local score=0; local rank="Beginner"; local next_rank="50"
+    [[ -f "$LOG_FILE" ]] && score=$(wc -l < "$LOG_FILE")
+    if (( score > 1000 )); then rank="${C_PACMAN}LEGENDARY${NC}"; next_rank="MAX"
+    elif (( score > 500 )); then rank="${C_PINKY}Arch Wizard${NC}"; next_rank="1000"
+    elif (( score > 200 )); then rank="${C_CLYDE}Veteran${NC}"; next_rank="500"
+    elif (( score > 50 )); then rank="${C_INKY}Ricer${NC}"; next_rank="200"
+    fi
+    local loot_str="${C_PACMAN}${score}${NC} / ${next_rank}"
+
+    # Header
+    echo -e "${C_PACMAN}${BOLD}"
+    echo "  .--.   PACSMART v19.1"
+    echo " / _.-'  (Fully Documented)"
+    echo " \  '-.  ${DIM}Automated & Informative${NC}"
+    echo -e "  '--'   ${NC}\n"
+
+    # Profile Table
+    echo -e "${C_TEXT}┌── PLAYER PROFILE ──────────────────────────────┐${NC}"
+    print_row "User      " "$USER"
+    print_row "System    " "$HOSTNAME"
+    print_row "Engine    " "$AUR_HELPER"
+    echo -e "${C_TEXT}├── STATS ───────────────────────────────────────┤${NC}"
+    print_row "Rank      " "$rank"
+    print_row "Loot      " "$loot_str"
+    echo -e "${C_TEXT}└────────────────────────────────────────────────┘${NC}\n"
+    
+    echo -e "${BOLD}GAME CONTROLS & CHEATSHEET:${NC}\n"
+
+    # Category 1: Main Actions
+    echo -e "  ${C_PACMAN}${ICON_PAC} ATTACK COMMANDS (Install/Update)${NC}"
+    print_cmd "-S <pkg>" "Install paket (Repo/AUR Auto-detect)"
+    print_cmd "-Syu" "Update System & Aplikasi"
+    print_cmd "-U <file.zst>" "Install file paket lokal"
+    print_cmd "--fast" "${C_PINKY}Speedrun Mode (Skip Animasi)${NC}"
+    echo ""
+
+    # Category 2: Maintenance & Automation
+    echo -e "  ${C_PINKY}${ICON_BROOM} DEFENSE & AUTOMATION${NC}"
+    print_cmd "-C, --clean" "${C_PACMAN}Auto-Clean Orphans (Sampah)${NC}"
+    print_cmd "--unlock" "${C_CLYDE}Medic Mode (Fix db.lck error)${NC}"
+    print_cmd "-Rns <pkg>" "Uninstall paket BERSIH + Dependensi"
+    print_cmd "-Sc" "Bersihkan Cache Pacman"
+    echo ""
+
+    # Category 3: Info & Search
+    echo -e "  ${C_CLYDE}${ICON_SEARCH} INTEL COMMANDS (Search)${NC}"
+    print_cmd "-Ss <kata>" "Cari paket di database"
+    print_cmd "-Si <pkg>" "Lihat info detail paket online"
+    print_cmd "-Qdt" "Cek manual list Orphan"
+    print_cmd "-F <file>" "Cari pemilik file tertentu"
+    echo ""
+
+    # Category 4: Specials
+    echo -e "  ${C_INKY}${ICON_STAR} SPECIAL FLAGS${NC}"
+    print_cmd "--simulate" "Demo Mode (Cek info tanpa install)"
+    print_cmd "--noconfirm" "Yes to All prompts"
+    echo ""
+
+    # --- NEW COMPATIBILITY NOTE ---
+    echo -e "${C_GREY}──────────────────────────────────────────────────${NC}"
+    echo -e "  ${C_INKY}${ICON_GEAR} UNIVERSAL COMPATIBILITY:${NC}"
+    echo -e "  ${C_TEXT}Script ini bisa menggunakan SEMUA flags/options dari${NC}"
+    echo -e "  ${C_TEXT}pacman, yay, atau paru (contoh: --overwrite, --asdeps).${NC}"
+    echo -e "${C_GREY}──────────────────────────────────────────────────${NC}"
+    
+    echo -e "${C_CLYDE}${ICON_TROPHY} TIP:${NC} ${C_TEXT}Gunakan ${C_INKY}pacsmart -C${C_TEXT} secara rutin agar sistem tetap ringan!${NC}"
+    echo ""
+}
+
+save_high_score() {
+    local pkgs=("$@")
+    for pkg in "${pkgs[@]}"; do echo "$pkg" >> "$LOG_FILE"; done
+    sort -uo "$LOG_FILE" "$LOG_FILE" 2>/dev/null
+}
+
+waka_loader() {
+    if [[ $FAST_MODE -eq 1 ]]; then return; fi
+    local msg="$1"
+    local duration=6
+    tput civis 
+    echo -ne "${C_PACMAN}${BOLD}$msg ${NC}\n"
+    for ((i=0; i<=duration; i++)); do
+        dots=$(printf "%0.s${ICON_PELLET} " $(seq 1 $((duration-i))))
+        echo -ne "\r${C_PACMAN}C ${dots}${NC}${C_GHOST}${ICON_GHOST}${NC}"
+        sleep 0.1
+        echo -ne "\r${C_PACMAN}o ${dots}${NC}${C_GHOST}${ICON_GHOST}${NC}"
+        sleep 0.1
+    done
+    echo -ne "\r\033[K"
+    tput cnorm
+}
+
+# -------------------------
+# 3. Execution Wrapper
+# -------------------------
+execute_arcade() {
+    local action_name="$1"
+    local action_color="$2"
+    shift 2
+    local cmd=("$@")
+
+    echo -e "${action_color}>>> MISSION START: $action_name >>>${NC}"
+    "${cmd[@]}"
+    local status=$?
+
+    if [[ $status -eq 0 ]]; then
+        echo -e "${C_CLYDE}${BOLD}${ICON_CHERRY} MISSION ACCOMPLISHED!${NC}\n"
+        return 0
+    else
+        echo -e "${C_BLINKY}${BOLD}${ICON_SKULL} MISSION FAILED!${NC}\n"
+        return $status
+    fi
+}
+
+# -------------------------
+# 4. Automaton Logic
+# -------------------------
+
+smart_clean() {
+    echo -e "${C_PINKY}>>> MISSION START: GARBAGE COLLECTOR >>>${NC}"
+    echo -e "${C_GREY}Scanning for orphans...${NC}"
+    local orphans=$(pacman -Qdtq || true)
+    
+    if [[ -z "$orphans" ]]; then
+        echo -e "${C_CLYDE}${ICON_CHERRY} System clean! No orphans found.${NC}"
+        return 0
+    fi
+    
+    echo -e "${C_WARN} Found Orphans: ${C_TEXT}$orphans${NC}"
+    execute_arcade "REMOVING TRASH" "$C_BLINKY" sudo pacman -Rns $orphans
+}
+
+smart_unlock() {
+    echo -e "${C_INKY}>>> MISSION START: MEDIC (DB UNLOCK) >>>${NC}"
+    if [[ -f /var/lib/pacman/db.lck ]]; then
+        echo -e "${C_WARN} Lock file found! Removing...${NC}"
+        sudo rm /var/lib/pacman/db.lck
+        echo -e "${C_CLYDE}${ICON_MEDIC} Lock removed. Fixed.${NC}"
+    else
+        echo -e "${C_CLYDE} System healthy. No lock file found.${NC}"
+    fi
+}
+
+# -------------------------
+# 5. Standard Logic
+# -------------------------
+
+smart_install() {
+    local repo_list=(); local aur_list=()
+    echo -e "${C_INKY}Target Acquired:${NC}"
+    for pkg in "${TARGETS[@]}"; do
+        if pacman -Si "$pkg" &>/dev/null; then
+            repo_list+=("$pkg"); echo -e "  ${C_CLYDE}${ICON_PELLET} REPO :${NC} $pkg"
+        elif $AUR_HELPER -Si "$pkg" &>/dev/null; then
+            aur_list+=("$pkg"); echo -e "  ${C_PINKY}${ICON_PELLET} AUR  :${NC} $pkg"
+        else echo -e "  ${C_BLINKY}X MISS :${NC} Paket '$pkg' gak ketemu."; fi
+    done
+    echo ""
+
+    if [[ ${#repo_list[@]} -gt 0 ]]; then
+        waka_loader "Chomping Official Repos..."
+        if execute_arcade "EATING (REPO)" "$C_INKY" sudo pacman -S --needed "${PASSTHROUGH_FLAGS[@]}" "${repo_list[@]}"; then
+            save_high_score "${repo_list[@]}"; else exit 1; fi
+    fi
+    if [[ ${#aur_list[@]} -gt 0 ]]; then
+        waka_loader "Chomping AUR via $AUR_HELPER..."
+        if execute_arcade "EATING (AUR)" "$C_INKY" $AUR_HELPER -S --needed "${PASSTHROUGH_FLAGS[@]}" "${aur_list[@]}"; then
+            save_high_score "${aur_list[@]}"; else exit 1; fi
+    fi
+    echo -e "${C_CLYDE}${BOLD}${ICON_TROPHY} LEVEL CLEARED!${NC}"
+}
+
+smart_update() {
+    waka_loader "Power-up: System Upgrade..."
+    execute_arcade "LEVEL UP" "$C_PINKY" $AUR_HELPER -Syu "${PASSTHROUGH_FLAGS[@]}"
+}
+
+smart_passthrough() {
+    local args_str="${RAW_ARGS[*]}"
+    if [[ "$args_str" == *"-R"* ]]; then execute_arcade "KILLING" "$C_BLINKY" $AUR_HELPER "${RAW_ARGS[@]}"
+    elif [[ "$args_str" == *"-Q"* ]]; then execute_arcade "INTEL SEARCH" "$C_INKY" $AUR_HELPER "${RAW_ARGS[@]}"
+    else execute_arcade "CUSTOM COMMAND" "$C_GREY" $AUR_HELPER "${RAW_ARGS[@]}"; fi
+}
+
+# -------------------------
+# 6. Intelligent Parser
+# -------------------------
+
+parse_arguments() {
+    local has_S=0; local is_other_op=0 
+
+    for arg in "${RAW_ARGS[@]}"; do
+        case "$arg" in
+            -S|--install) has_S=1 ;;
+            -Sy|-Syu|-Syyu) has_S=1 ;;
+            -h|--help) MODE="help"; return ;;
+            --simulate) MODE="simulate" ;;
+            
+            -C|--clean) MODE="clean"; return ;;
+            --unlock) MODE="unlock"; return ;;
+            --fast) FAST_MODE=1 ;;
+            
+            --log*) ;; 
+            -[R,Q,F,D,U]*|--remove|--query|--database|--upgrade) is_other_op=1 ;;
+            -*) PASSTHROUGH_FLAGS+=("$arg") ;;
+            *) TARGETS+=("$arg") ;;
+        esac
+    done
+
+    if [[ -n "$MODE" ]]; then return; fi
+
+    if [[ $is_other_op -eq 1 ]]; then MODE="passthrough"
+    elif [[ $has_S -eq 1 ]]; then
+        local arg_string="${RAW_ARGS[*]}"
+        if [[ "$arg_string" == *"-u"* ]] || [[ ${#TARGETS[@]} -eq 0 ]]; then MODE="update"
+        else MODE="install"; fi
+    else if [[ ${#RAW_ARGS[@]} -eq 0 ]]; then MODE="update"; else MODE="passthrough"; fi; fi
+}
+
+# -------------------------
+# 7. Main Execution
+# -------------------------
+
+detect_aur_helper
+parse_arguments
+
+case "$MODE" in
+    help) show_help ;;
+    simulate)
+        echo -e "${C_INKY}--- DEMO MODE ---${NC}"
+        for pkg in "${TARGETS[@]}"; do
+             echo -e "\n${C_PACMAN}${ICON_PAC} Info: $pkg${NC}"
+             $AUR_HELPER -Si "$pkg" 2>/dev/null | grep -E --color=always '^(Name|Version|Repository|Description)' || echo "Not Found"
+        done ;;
+    clean) init_sudo; smart_clean ;;
+    unlock) init_sudo; smart_unlock ;;
+    *)
+        init_sudo 
+        if [[ "$MODE" == "install" ]]; then
+            [[ ${#TARGETS[@]} -eq 0 ]] && { echo "Mana paketnya?"; exit 1; }
+            smart_install
+        elif [[ "$MODE" == "update" ]]; then smart_update
+        else smart_passthrough; fi ;;
+esac
